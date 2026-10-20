@@ -1,0 +1,38 @@
+{
+  "models": [
+    {
+      "id": "puffer162", "name": "PufferLib 162",
+      "about": "14M parameters · 4 MinGRU layers, PufferLib's best",
+      "by": "PufferAI (PufferLib 5.0)", "license": "MIT",
+      "source": "https://github.com/PufferAI/PufferLib/releases/download/5.0-experiments/puffer5_models.zip",
+      "score": "162 / 226 (their evaluation)",
+      "onnx": "agent/puffer162.onnx", "bytes": 57223067,
+      "sha256": "feeb5e8fd974383674af32e56f06f28f41a72189af360d1ec13a769249bc2687",
+      "obs": "packed843",
+      "state": [{ "in": "h", "out": "h_out", "shape": [4, 1, 1024] }],
+      "brain": { "output": "h_out", "layers": 4 }
+    },
+    {
+      "id": "ppo-rnn", "name": "PPO-RNN (Craftax paper)",
+      "about": "6.9M parameters · one GRU, the Craftax paper's baseline",
+      "by": "NeuralCrystal (reproduction)", "license": "MIT",
+      "source": "https://github.com/MichaelTMatthews/Craftax_Baselines",
+      "score": "37–44 / 226 (3 local greedy episodes; its training return 36.8)",
+      "onnx": "agent/ppo-rnn.onnx", "bytes": 27535361, "sha256": "8a0ee8bc3090fe09297842ad264e4c0d53dc2c9989e02c0d640155621a73a30b",
+      "obs": "packed843",
+      "state": [{ "in": "h", "out": "h_out", "shape": [1, 1, 512] }],
+      "brain": { "output": "h_out", "layers": 1 }
+    },
+    {
+      "id": "trxl", "name": "TransformerXL PPO",
+      "about": "4.7M parameters · Transformer-XL, remembers 128 steps",
+      "by": "Gautier Hamon (Reytuag)", "license": "MIT",
+      "source": "https://github.com/Reytuag/transformerXL_PPO_JAX/tree/518de77e8e4c8a324e48478fcbba2a1f012448f1/results_craftax/base_A100_1e9",
+      "score": "41.9 / 226 (their training return at 1e9 steps, seed 2)",
+      "onnx": "agent/trxl.onnx", "bytes": 18776528, "sha256": "f9118b2eee41345930abfeb185644430e20eb842f64cedb7eff5628970f25a7c",
+      "obs": "packed843",
+      "state": [{ "in": "kv", "out": "kv_out", "shape": [4, 1, 128, 256] }, { "in": "fill", "out": "fill_out", "shape": [1] }],
+      "brain": { "output": "layers", "layers": 3 }
+    }
+  ]
+}
