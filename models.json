@@ -15,9 +15,9 @@
     {
       "id": "ppo-rnn", "name": "PPO-RNN (Craftax paper)",
       "about": "6.9M parameters · one GRU, the Craftax paper's baseline",
-      "by": "NeuralCrystal (reproduction)", "license": "MIT",
+      "by": "Matthews et al., Craftax paper (reproduced)", "license": "MIT",
       "source": "https://github.com/MichaelTMatthews/Craftax_Baselines",
-      "score": "37–44 / 226 (3 local greedy episodes; its training return 36.8)",
+      "score": "37 / 226, 16% (the paper reports 15.3%)",
       "onnx": "agent/ppo-rnn.onnx", "bytes": 27535361, "sha256": "8a0ee8bc3090fe09297842ad264e4c0d53dc2c9989e02c0d640155621a73a30b",
       "obs": "packed843",
       "state": [{ "in": "h", "out": "h_out", "shape": [1, 1, 512] }],
