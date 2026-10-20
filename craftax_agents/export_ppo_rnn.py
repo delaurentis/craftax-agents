@@ -9,7 +9,7 @@ Inside: symbolic.py unpack_nodes (843 → Craftax-Symbolic's 8,268) → Dense 51
 → 43 logits; critic the same → value. h is [layers = 1, 1, 512] so the brain view can sample it. Trained without an action mask; the
 browser masks anyway (argmax of the masked logits).
 Weights: a flax serialization (msgpack) of the params dict, {"params": {Dense_0..6, GRU_0: {GRUCell_0}}}; the network is ppo_rnn_net.py.
-Ours will be on Hugging Face as neuralcrystal/craftax-ppo-rnn; until then pass the file with --weights (default weights/ppo-rnn/params.msgpack).
+Ours: scripts/fetch_ppo_rnn.sh downloads them from huggingface.co/delaurentis/craftax-agents into weights/ppo-rnn/params.msgpack (the default --weights).
 The GRU width is read from a config.json beside the weights ({"width": 512}) when there is one, else --width.
 """
 import argparse, json, os, sys
@@ -122,7 +122,7 @@ def reference(entry=None, weights=None):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--weights", default=WEIGHTS, help="the params as a flax msgpack (neuralcrystal/craftax-ppo-rnn on Hugging Face)")
+    ap.add_argument("--weights", default=WEIGHTS, help="the params as a flax msgpack (ours: scripts/fetch_ppo_rnn.sh)")
     ap.add_argument("--width", type=int, default=512, help="GRU width, when no config.json sits beside the weights")
     ap.add_argument("--out", default=OUT)
     ap.add_argument("--check", type=int, default=0, help="steps of native-engine play to compare ONNX with the flax module (0 = skip)")

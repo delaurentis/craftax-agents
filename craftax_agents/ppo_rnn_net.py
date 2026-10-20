@@ -1,5 +1,5 @@
-"""The Craftax paper's PPO-RNN network in flax (Matthews et al. 2024; Craftax_Baselines ppo_rnn.py, MIT): the module the
-neuralcrystal/craftax-ppo-rnn weights were trained with, here only to check export_ppo_rnn.py's ONNX graph against it.
+"""The Craftax paper's PPO-RNN network in flax (Matthews et al. 2024; Craftax_Baselines ppo_rnn.py, MIT): the module our
+ppo-rnn weights (huggingface.co/delaurentis/craftax-agents) were trained with, here only to check export_ppo_rnn.py's ONNX graph against it.
 
     Dense 512 + relu → GRU (flax GRUCell 512, reset to zeros where an episode begins) → actor 2 × (Dense 512 + relu) → 43 logits,
     critic the same → value.

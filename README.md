@@ -49,6 +49,8 @@ python -m craftax_agents.check_model out/puffer162.onnx --id puffer162 --episode
 | `ppo-rnn` | PPO with one GRU of 512 (6.9M parameters), trained for 1e9 steps | Reproduction of the PPO-RNN baseline from Matthews et al.'s Craftax paper ([Craftax_Baselines](https://github.com/MichaelTMatthews/Craftax_Baselines)) |
 | `trxl` | PPO with a gated Transformer-XL (2 layers of 256, memory 128, 4.7M parameters) | Gautier Hamon ([transformerXL_PPO_JAX](https://github.com/Reytuag/transformerXL_PPO_JAX)) |
 
+All three, at 32, 16 and 8 bits and as safetensors, are on Hugging Face: [delaurentis/craftax-agents](https://huggingface.co/delaurentis/craftax-agents).
+
 `variants.py` writes any playable model at 16 and 8 bits (smaller downloads, the same float32 maths) and as safetensors.
 
 ## Convert your agent
