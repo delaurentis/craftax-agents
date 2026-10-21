@@ -6,9 +6,10 @@
     python -m craftax_agents.check_model out/ppo-rnn.onnx --id ppo-rnn --ref craftax_agents.export_ppo_rnn:reference   # also vs a reference step
     python -m craftax_agents.check_model out/ppo-rnn.onnx --id ppo-rnn --write-registry   # fill that entry's bytes + sha256 in models.json
 
-Checks: inputs = "obs" float32 [1, 843] + the entry's state inputs, outputs = "logits" [1, 43] + the state outputs (+ optional "value",
+Checks: inputs = "obs" float32 [1, 843] + the entry's state inputs (+ its "prev_action" input [1], when it declares one), outputs = "logits" [1, 43] + the state outputs (+ optional "value",
 the brain output [layers, 1, units]), every shape and dtype; then plays --episodes episodes (at most --steps steps in all) with the engine's
-action mask and argmax (or sampling at --temperature), states zeros at each episode start and fed back from their outputs. Fails on
+action mask and argmax (or sampling at --temperature), states zeros at each episode start and fed back from their outputs, prev_action
+the action picked last step (43 at an episode start). Fails on
 NaN / Inf, on a state that never changes (not fed back?), on shapes that drift. Reports steps/s, each episode's score (cx_score,
 Craftax's achievements) and how often each action was picked. --ref module:fn: fn(entry) → step(obs, states) → logits [1, 43], run on
 the same trajectory (the ONNX states), max |diff| and argmax agreement reported. Needs the native engine (native.py says where it looks).
@@ -55,8 +56,9 @@ def check_io(sess, entry):
     want(ins, "obs", [1, OBS], "input"); want(outs, "logits", [1, N_ACTIONS], "output")
     for s in entry.get("state", []):
         want(ins, s["in"], s["shape"], "state input"); want(outs, s["out"], s["shape"], "state output")
-    extra = set(ins) - {"obs"} - {s["in"] for s in entry.get("state", [])}
-    if extra: bad(f"inputs {sorted(extra)} not in the entry's state list: the browser would not feed them")
+    if entry.get("prev_action"): want(ins, entry["prev_action"], [1], "prev_action input")
+    extra = set(ins) - {"obs", entry.get("prev_action")} - {s["in"] for s in entry.get("state", [])}
+    if extra: bad(f"inputs {sorted(extra)} not in the entry's state list (or its prev_action): the browser would not feed them")
     if "value" in outs: want(outs, "value", None, "output")
     b = entry.get("brain")
     if b:
@@ -68,26 +70,29 @@ def check_io(sess, entry):
 
 
 def guess_entry(sess, path):
-    """No entry: every input but obs is a state, its output named X_out (or the one output left with its shape)."""
-    outs = {o.name: o for o in sess.get_outputs()}; st = []
+    """No entry: an input named prev_action is the previous action (FORMAT.md); every other input but obs is a state, its output
+    named X_out (or the one output left with its shape)."""
+    outs = {o.name: o for o in sess.get_outputs()}; st = []; pa = {}
     for i in sess.get_inputs():
-        if i.name == "obs": continue
+        if i.name == "prev_action": pa = {"prev_action": i.name}
+        if i.name in ("obs", "prev_action"): continue
         o = i.name + "_out" if i.name + "_out" in outs else next((n for n, t in outs.items() if t.shape == i.shape and n not in ("logits", "value")), None)
         st.append({"in": i.name, "out": o, "shape": [d if isinstance(d, int) else 1 for d in i.shape]})
-    return {"id": os.path.splitext(os.path.basename(path))[0], "obs": "packed843", "state": st}
+    return {"id": os.path.splitext(os.path.basename(path))[0], "obs": "packed843", "state": st, **pa}
 
 
 def play(sess, entry, a, ref):
     from craftax_agents.native import Game
-    st = entry.get("state", []); names = [o.name for o in sess.get_outputs()]
+    st = entry.get("state", []); names = [o.name for o in sess.get_outputs()]; pa = entry.get("prev_action")
     zeros = lambda: {s["in"]: np.zeros(s["shape"], np.float32) for s in st}
     g = Game(4 | 2)                                                                # CX_ACTION_MASK + CX_KEEP_DEAD, sleeps fast-forwarded (the browser's engine)
     rng = np.random.default_rng(a.seed); counts = np.zeros(N_ACTIONS, np.int64); scores, lengths = [], []
     moved = {s["in"]: False for s in st}; t_run = 0.0; steps = 0; worst = 0.0; agree = 0; refd = 0
     for ep in range(a.episodes):
-        g.reset(a.seed + ep); feeds = zeros(); n = 0
+        g.reset(a.seed + ep); feeds = zeros(); n = 0; prev = N_ACTIONS                # 43: no previous action at an episode start
         while steps < a.steps:
             obs, mask = g.obs()[None], g.mask()
+            if pa: feeds[pa] = np.array([prev], np.float32)
             t0 = time.perf_counter(); res = dict(zip(names, sess.run(None, dict(feeds, obs=obs)))); t_run += time.perf_counter() - t0
             for k, v in res.items():
                 if not np.all(np.isfinite(v)): bad(f"output {k!r} not finite at episode {ep} step {n}"); return
@@ -106,7 +111,7 @@ def play(sess, entry, a, ref):
                 v = res[s["out"]]
                 if list(v.shape) != list(s["shape"]): bad(f"state {s['out']!r} came back {list(v.shape)}, want {s['shape']}"); return
                 moved[s["in"]] |= not np.array_equal(v, feeds[s["in"]]); nxt[s["in"]] = v
-            feeds = nxt; counts[act] += 1; steps += 1; n += 1
+            feeds = nxt; prev = act; counts[act] += 1; steps += 1; n += 1
             if g.step(act): break
         scores.append(g.score()); lengths.append(n)
         print(f"  episode {ep} (seed {a.seed + ep}): score {g.score():.0f}, {n} steps{'' if g.cx.cx_done(g.g) else ' (cut: --steps reached)'}")
@@ -161,7 +166,7 @@ if __name__ == "__main__":
     ap.add_argument("--episodes", type=int, default=3)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--temperature", type=float, default=0.0, help="0 = masked argmax; > 0 samples softmax(logits / T) over the allowed actions")
-    ap.add_argument("--ref", help="module:fn, fn(entry) → step(obs [1, 843], states {in: array}) → logits [1, 43]")
+    ap.add_argument("--ref", help="module:fn, fn(entry) → step(obs [1, 843], states {in: array}, + prev_action) → logits [1, 43]")
     ap.add_argument("--write-registry", action="store_true", help="fill this entry's bytes + sha256 in models.json")
     a = ap.parse_args()
     import onnxruntime as ort

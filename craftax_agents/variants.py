@@ -9,7 +9,8 @@ From <id>.onnx (fp32) it writes, beside it:
 Only weights are stored lower: every model still computes in float32, so the browser runs all three the same way. Then it plays
 on the native engine with the fp32 model choosing and the others run alongside: how often each one's greedy action agrees, and
 the largest logit difference; and a few episodes with each one choosing, their scores (a few local episodes, not an evaluation).
-State: every input but "obs" is recurrent, fed back from the output named <in>_out (h → h_out), zeros at an episode start.
+State: every input but "obs" is recurrent, fed back from the output named <in>_out (h → h_out), zeros at an episode start; but an
+input "prev_action" [1] gets the action taken last step (43 at an episode start), FORMAT.md.
 """
 import argparse, hashlib, os, sys
 import numpy as np
@@ -66,16 +67,18 @@ class Player:
     def __init__(self, path):
         import onnxruntime as ort
         self.s = ort.InferenceSession(path, providers=["CPUExecutionProvider"])
-        self.ins = [i for i in self.s.get_inputs() if i.name != "obs"]
+        self.ins = [i for i in self.s.get_inputs() if i.name not in ("obs", "prev_action")]
+        self.pa = any(i.name == "prev_action" for i in self.s.get_inputs())
         outs = [o.name for o in self.s.get_outputs()]
         self.outs = ["logits"] + [i.name + "_out" for i in self.ins]
         missing = [o for o in self.outs if o not in outs]
         if missing: sys.exit(f"{path}: no output {missing} (state input X must come back as X_out)")
         self.reset()
     def reset(self):
-        self.h = {i.name: np.zeros([1 if not isinstance(d, int) else d for d in i.shape], np.float32) for i in self.ins}
+        self.h = {i.name: np.zeros([1 if not isinstance(d, int) else d for d in i.shape], np.float32) for i in self.ins}; self.prev = 43
+    def took(self, a): self.prev = a                                               # the action played: the next step's prev_action
     def logits(self, obs):
-        r = self.s.run(self.outs, {"obs": obs[None], **self.h})
+        r = self.s.run(self.outs, {"obs": obs[None], **self.h, **({"prev_action": np.array([self.prev], np.float32)} if self.pa else {})})
         self.h = {i.name: v for i, v in zip(self.ins, r[1:])}
         return r[0][0]
 
@@ -91,7 +94,7 @@ def play(paths, steps, episodes, seed=7):
         lo = [p.logits(obs) for p in ps]
         a = greedy(lo[0], mask)
         for k in range(len(ps)):
-            agree[k] += greedy(lo[k], mask) == a; worst[k] = max(worst[k], float(np.abs(lo[k] - lo[0]).max()))
+            agree[k] += greedy(lo[k], mask) == a; worst[k] = max(worst[k], float(np.abs(lo[k] - lo[0]).max())); ps[k].took(a)
         if g.step(a):
             g.reset(seed + t + 1); [p.reset() for p in ps]
     scores = []
@@ -100,8 +103,8 @@ def play(paths, steps, episodes, seed=7):
         for e in range(episodes):
             g = Game(4 | 2); g.reset(1000 + e); p.reset()
             for _ in range(100000):
-                o = g.obs()
-                if g.step(greedy(p.logits(o), g.mask())): break
+                o = g.obs(); act = greedy(p.logits(o), g.mask()); p.took(act)
+                if g.step(act): break
             sc.append(g.score())
         scores.append(sc)
     return agree / steps, worst, scores

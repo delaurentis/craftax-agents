@@ -48,8 +48,9 @@ python -m craftax_agents.check_model out/puffer162.onnx --id puffer162 --episode
 | `puffer162` | PPO + 4 MinGRU layers of 1024 (14M parameters). 162 / 226 in PufferLib's own evaluation; reaches the fire realm. | PufferAI ([PufferLib 5.0](https://github.com/PufferAI/PufferLib)) |
 | `ppo-rnn` | PPO with one GRU of 512 (6.9M parameters), trained for 1e9 steps | Reproduction of the PPO-RNN baseline from Matthews et al.'s Craftax paper ([Craftax_Baselines](https://github.com/MichaelTMatthews/Craftax_Baselines)) |
 | `trxl` | PPO with a gated Transformer-XL (2 layers of 256, memory 128, 4.7M parameters) | Gautier Hamon ([transformerXL_PPO_JAX](https://github.com/Reytuag/transformerXL_PPO_JAX)) |
+| `priml-boss` | PPO with a convolutional board encoder that also reads its last action, then 4 MinGRU layers of 1024 that each read the frame again (15M parameters), fine-tuned for the final boss. 194 / 226 in priml's own evaluation (10,068 games). | Reproduction of rekursiv.ai's recipe ([priml](https://github.com/rekursiv-ai/priml)) |
 
-All three, at 32, 16 and 8 bits and as safetensors, are on Hugging Face: [delaurentis/craftax-agents](https://huggingface.co/delaurentis/craftax-agents).
+All four, at 32, 16 and 8 bits and as safetensors, are on Hugging Face: [delaurentis/craftax-agents](https://huggingface.co/delaurentis/craftax-agents). `priml-boss`'s safetensors are priml's own bf16 weights, which `export_priml.py` turns into the playable file. playcraftax.com loads the 16-bit files, which play the same moves.
 
 `variants.py` writes any playable model at 16 and 8 bits (smaller downloads, the same float32 maths) and as safetensors.
 
@@ -64,6 +65,7 @@ The full contract is in [FORMAT.md](FORMAT.md). In short:
 | output | `logits` | `[1, 43]` Craftax's actions, in Craftax's order |
 | output | `X_out` | the next step's `X` |
 | output | `value` | `[1]`, optional |
+| input | `prev_action` | `[1]`, optional: the action played last step, 43 at an episode start ([FORMAT.md](FORMAT.md#the-previous-action)) |
 
 Opset 17, IR version 8, float32, batch 1, and one file under 2 GB. If your agent was trained on JAX Craftax-Symbolic (8,268 floats), start the graph with `symbolic.py`'s `unpack_nodes()`. It turns the 843 back into those exact 8,268 floats.
 
@@ -117,6 +119,7 @@ To list your agent for everyone, open a pull request to this repository that add
 | `bytes`, `sha256` | exactly what `check_model.py` printed for that file; if the file changes, these change too |
 | `obs` | always `packed843` for now |
 | `state` | one item per memory input, with its output and shape (`[]` for a network without memory) |
+| `prev_action` | optional: the name of an input `[1]` that gets the action played last step, 43 at an episode start (see [FORMAT.md](FORMAT.md#the-previous-action)); leave it out if your network doesn't read its last action |
 | `brain` | optional: an output shaped `[layers, 1, units]` that the game's brain view draws |
 
 In the PR description, paste the output of `python -m craftax_agents.check_model your.onnx --entry your-entry.json --episodes 3`.
@@ -135,6 +138,7 @@ In the PR description, paste the output of `python -m craftax_agents.check_model
 | `craftax_agents/export_ppo_rnn.py`, `ppo_rnn_net.py` | the Craftax paper's PPO-RNN (flax msgpack) → ONNX |
 | `craftax_agents/export_baselines_rnn.py` | a Craftax_Baselines PPO-RNN (Orbax checkpoint) → ONNX |
 | `craftax_agents/export_trxl.py` | transformerXL_PPO_JAX → ONNX |
+| `craftax_agents/export_priml.py`, `priml_net.py` | priml's Craftax policy (safetensors) → ONNX, with the `prev_action` input; `priml_net.py` is its forward pass in NumPy |
 | `craftax_agents/variants.py` | 16-bit, 8-bit and safetensors copies of a playable model |
 | `scripts/fetch_*.sh` | the upstream weights (and, for the checks, upstream model code), pinned and sha256-checked |
 
@@ -144,6 +148,7 @@ In the PR description, paste the output of `python -m craftax_agents.check_model
 - **PufferLib**: Joseph Suarez and PufferAI ([code](https://github.com/PufferAI/PufferLib), MIT). The C port of Craftax that craftax-wasm is forked from, and the 162 policy (Daphne Cornelisse, *Lessons from reaching level 6 in Craftax through tabula rasa on-policy RL*, 2026). `puffer_net.py` is a NumPy port of their network, observation packing and action mask.
 - **Craftax_Baselines**: Michael Matthews ([code](https://github.com/MichaelTMatthews/Craftax_Baselines), MIT). The Craftax paper's PPO-RNN, adapted from PureJaxRL (Chris Lu). `ppo_rnn_net.py` and `export_baselines_rnn.py` restate its network. The `ppo-rnn` agent is our retraining of it.
 - **transformerXL_PPO_JAX**: Gautier Hamon ([code](https://github.com/Reytuag/transformerXL_PPO_JAX), MIT). The `trxl` agent and its weights. `export_trxl.py` checks against their code, downloaded unmodified.
+- **priml**: Joshua V. Dillon and Dan Kondratyuk, rekursiv.ai ([code](https://github.com/rekursiv-ai/priml), Apache-2.0). The recipe and the policy network that the `priml-boss` agent reproduces. `priml_net.py` and `export_priml.py` restate the network and were checked against their PyTorch module.
 - **ReMDM checkpoints**: the authors of *Return-Weighted ELBO Fine-Tuning Degrades Masked Diffusion Planners* ([weights](https://huggingface.co/mathisweil/remdm-craftax-checkpoints), MIT). The PPO-RNN that `fetch_remdm.sh` downloads.
 - **ONNX Runtime** (Microsoft, MIT) runs the agents, in Python here and as onnxruntime-web on playcraftax.com.
 

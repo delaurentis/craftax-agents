@@ -13,12 +13,17 @@ One ONNX file per model, **batch 1**, float32. One call = one agent step.
 | output | `logits` | `[1, 43]` | Craftax's 43 actions, in Craftax's order. |
 | output | `value` | `[1]` | optional. |
 | output | your state output(s) | same shape as the input | the next step's state. |
+| input | `prev_action` | `[1]` | optional: the action played last step ([below](#the-previous-action)). |
 
 The browser masks `logits` with the engine's action mask (PufferLib's: actions that cannot do anything now are off) and takes the argmax, or samples at a temperature. A model trained without a mask works fine.
 
 **Trained on JAX Craftax-Symbolic (8,268 floats)?** Start your graph with `craftax_agents/symbolic.py` `unpack_nodes()`: it turns the 843 back into the exact 8,268 floats JAX gave you (checked bit-exact against JAX Craftax; `python -m craftax_agents.symbolic --check 64`). In NumPy the same thing is `unpack()`. Pixel observations are not supported.
 
 **Sleep.** The engine plays a whole sleep / rest as ONE agent step (as PufferLib trains; craftax-wasm's `tests/parity.py` explains), where JAX Craftax asks the agent every tick while asleep. A recurrent model trained on JAX simply sees fewer steps while asleep. That is fine in practice: those steps carry no choice (every action is a no-op while asleep).
+
+## The previous action
+
+Optional, for a policy that reads its own last action beside the observation (priml's does). Add a float32 input of shape `[1]` and name it in the registry entry (`"prev_action": "prev_action"`). Each step the browser feeds it the action actually played on the previous step, after the mask and the sampling (an integer 0 to 42, as a float). At an episode start, after a reset and when the player switches to your model, it feeds 43, meaning none. When a player has the bot watch their own moves, it feeds the player's action. It is saved and restored with the model's memory. `check_model.py` feeds it the same way. `export_priml.py` builds a graph with this input.
 
 ## The registry entry
 
@@ -39,6 +44,7 @@ Each model is one entry in `models.json`:
 
 - `onnx`: an https URL (the agents the game builds itself use paths relative to its page, like `agent/ppo-rnn.onnx`) (it must answer with CORS headers so the page can fetch it). `bytes` and `sha256` are the file's (`check_model.py` prints them).
 - `state`: one item per recurrent input; `[]` for a feed-forward model.
+- `prev_action` (optional): the name of the [previous action](#the-previous-action) input.
 - `brain` (optional): an output shaped `[layers, 1, units]` that the brain view samples and draws (a GRU's `h_out` is ideal).
 
 ## From PyTorch
@@ -72,7 +78,7 @@ python -m craftax_agents.check_model my-model.onnx                              
 python -m craftax_agents.check_model my-model.onnx --entry my-entry.json --ref mymod:reference # also compare with your framework, step by step
 ```
 
-It checks the inputs and outputs against the entry (names, shapes, dtypes), then plays on the native engine as the browser does (masked argmax, state zeros at an episode start and fed back): fails on NaN / Inf or a state that never changes, and reports steps a second, each episode's score (`cx_score`: Craftax's achievement points, out of 226) and how often each action was picked. `--ref module:fn`: `fn(entry)` returns `step(obs [1, 843], states {name: array}) → logits [1, 43]` in your own framework; the checker runs it on the same trajectory and reports the largest logit difference and argmax agreement (aim for ~1e-4 and all agree). It prints `bytes` and `sha256` for the entry. Needs the native engine (see the README's [setup](README.md#setup); Python: `numpy onnx onnxruntime`).
+It checks the inputs and outputs against the entry (names, shapes, dtypes), then plays on the native engine as the browser does (masked argmax, state zeros at an episode start and fed back): fails on NaN / Inf or a state that never changes, and reports steps a second, each episode's score (`cx_score`: Craftax's achievement points, out of 226) and how often each action was picked. `--ref module:fn`: `fn(entry)` returns `step(obs [1, 843], states {name: array}) → logits [1, 43]` in your own framework (`states` holds the `prev_action` input too, when the entry declares one); the checker runs it on the same trajectory and reports the largest logit difference and argmax agreement (aim for ~1e-4 and all agree). It prints `bytes` and `sha256` for the entry. Needs the native engine (see the README's [setup](README.md#setup); Python: `numpy onnx onnxruntime`).
 
 ## Add it to the game
 
