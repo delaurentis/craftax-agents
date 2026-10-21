@@ -35,8 +35,8 @@
       "brain": { "output": "layers", "layers": 3 }
     },
     {
-      "id": "priml-boss", "name": "priml (boss fine-tune)",
-      "about": "15M parameters · board encoder + 4 MinGRU layers, reads its last action",
+      "id": "priml-boss", "name": "Rekursiv priml 194",
+      "about": "15M parameters · 4 MinGRU layers, fine-tuned to beat the final boss",
       "by": "rekursiv.ai's priml recipe (reproduced)", "license": "MIT",
       "source": "https://github.com/rekursiv-ai/priml",
       "score": "194 / 226 (priml's evaluation, 10,068 games)",
