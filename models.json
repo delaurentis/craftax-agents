@@ -43,6 +43,7 @@
       "onnx": "https://huggingface.co/delaurentis/craftax-agents/resolve/54cf15e06220667a5b96a37e9d629a73da8a7c08/priml-boss/priml-boss-16bit.onnx", "bytes": 30889605, "sha256": "e3cb4b724dde622291b8cd0d86ca633e1ff8c87b07415ba83ba71f4d12c34f03",
       "obs": "packed843",
       "prev_action": "prev_action",
+      "temperature": 1.0,
       "state": [{ "in": "h", "out": "h_out", "shape": [4, 1, 1024] }],
       "brain": { "output": "h_out", "layers": 4 }
     }

@@ -15,7 +15,7 @@ One ONNX file per model, **batch 1**, float32. One call = one agent step.
 | output | your state output(s) | same shape as the input | the next step's state. |
 | input | `prev_action` | `[1]` | optional: the action played last step ([below](#the-previous-action)). |
 
-The browser masks `logits` with the engine's action mask (PufferLib's: actions that cannot do anything now are off) and takes the argmax, or samples at a temperature. A model trained without a mask works fine.
+The browser masks `logits` with the engine's action mask (PufferLib's: actions that cannot do anything now are off) and takes the argmax, or samples at a temperature (the entry's `temperature`, which the player can change). A model trained without a mask works fine.
 
 **Trained on JAX Craftax-Symbolic (8,268 floats)?** Start your graph with `craftax_agents/symbolic.py` `unpack_nodes()`: it turns the 843 back into the exact 8,268 floats JAX gave you (checked bit-exact against JAX Craftax; `python -m craftax_agents.symbolic --check 64`). In NumPy the same thing is `unpack()`. Pixel observations are not supported.
 
@@ -45,6 +45,7 @@ Each model is one entry in `models.json`:
 - `onnx`: an https URL (the agents the game builds itself use paths relative to its page, like `agent/ppo-rnn.onnx`) (it must answer with CORS headers so the page can fetch it). `bytes` and `sha256` are the file's (`check_model.py` prints them).
 - `state`: one item per recurrent input; `[]` for a feed-forward model.
 - `prev_action` (optional): the name of the [previous action](#the-previous-action) input.
+- `temperature` (optional, 0 to 2, default 0.2): how playcraftax.com picks this agent's moves until the player moves the slider. 0 always takes the top allowed action, which can get stuck in loops; 0.2 mostly does; 1 samples from the agent's own odds, as most agents are trained and evaluated. Pick the value your agent plays best at. `check_model.py` uses it too.
 - `brain` (optional): an output shaped `[layers, 1, units]` that the brain view samples and draws (a GRU's `h_out` is ideal).
 
 ## From PyTorch

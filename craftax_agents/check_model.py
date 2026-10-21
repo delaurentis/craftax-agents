@@ -165,7 +165,8 @@ if __name__ == "__main__":
     ap.add_argument("--steps", type=int, default=2000, help="most steps to play in all")
     ap.add_argument("--episodes", type=int, default=3)
     ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--temperature", type=float, default=0.0, help="0 = masked argmax; > 0 samples softmax(logits / T) over the allowed actions")
+    ap.add_argument("--temperature", type=float, default=None, help="0 = masked argmax; > 0 samples softmax(logits / T) over the allowed actions "
+                    "(default: the entry's `temperature`, else 0)")
     ap.add_argument("--ref", help="module:fn, fn(entry) → step(obs [1, 843], states {in: array}, + prev_action) → logits [1, 43]")
     ap.add_argument("--write-registry", action="store_true", help="fill this entry's bytes + sha256 in models.json")
     a = ap.parse_args()
@@ -179,6 +180,10 @@ if __name__ == "__main__":
     if entry is None:
         entry = guess_entry(sess, a.onnx); print("  no entry given; guessed:", json.dumps(entry))
     print("interface"); check_io(sess, entry)
+    t = entry.get("temperature")
+    if t is not None and not (isinstance(t, (int, float)) and 0 <= t <= 2): bad(f"temperature {t!r}: a number from 0 to 2")
+    if a.temperature is None: a.temperature = float(t) if isinstance(t, (int, float)) and 0 <= t <= 2 else 0.0
+    print(f"  playing at temperature {a.temperature:g}" + (" (the entry's)" if t is not None and a.temperature == t else ""))
     for k, v in (("bytes", size), ("sha256", sha)):
         if entry.get(k) and entry[k] != v: print(f"  note entry {k} {entry[k]} != the file's {v}" + ("" if a.write_registry else " (--write-registry fixes it)"))
     if not problems:

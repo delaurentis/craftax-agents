@@ -120,6 +120,7 @@ To list your agent for everyone, open a pull request to this repository that add
 | `obs` | always `packed843` for now |
 | `state` | one item per memory input, with its output and shape (`[]` for a network without memory) |
 | `prev_action` | optional: the name of an input `[1]` that gets the action played last step, 43 at an episode start (see [FORMAT.md](FORMAT.md#the-previous-action)); leave it out if your network doesn't read its last action |
+| `temperature` | optional: how the game picks your agent's moves, 0 to 2 (0 = always its top move; 1 = its own odds, as in training; 0.2 if left out). The player can still change it |
 | `brain` | optional: an output shaped `[layers, 1, units]` that the game's brain view draws |
 
 In the PR description, paste the output of `python -m craftax_agents.check_model your.onnx --entry your-entry.json --episodes 3`.
